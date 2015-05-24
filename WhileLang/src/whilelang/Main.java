@@ -19,15 +19,20 @@
 package whilelang;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintStream;
 
+import jx86.lang.X86File;
+import whilelang.io.ClassFileWriter;
+import whilelang.io.Lexer;
+import whilelang.io.Parser;
+import whilelang.io.X86FileWriter;
+import whilelang.lang.WhileFile;
+import whilelang.util.DefiniteAssignment;
+import whilelang.util.SyntaxError;
+import whilelang.util.TypeChecker;
 // import jx86.io.AsmFileWriter;
 // import jx86.lang.X86File;
-
-import whilelang.io.*;
-import whilelang.lang.WhileFile;
-import whilelang.util.*;
+import jx86.io.AsmFileWriter;
 
 public class Main {
 
@@ -42,13 +47,13 @@ public class Main {
 	}
 
 	private static enum Mode { interpret, jvm, x86 };
-	
+
 	public static boolean run(String[] args) {
 		boolean verbose = false;
 		int fileArgsBegin = 0;
 		Mode mode = Mode.interpret;
-		// jx86.lang.Target target = jx86.lang.Target.MACOS_X86_64; // default
-		
+		jx86.lang.Target target = jx86.lang.Target.LINUX_X86_64; // default
+
 		for (int i = 0; i != args.length; ++i) {
 			if (args[i].startsWith("-")) {
 				String arg = args[i];
@@ -85,11 +90,11 @@ public class Main {
 			Lexer lexer = new Lexer(srcFile.getPath());
 			Parser parser = new Parser(srcFile.getPath(), lexer.scan());
 			WhileFile ast = parser.read();
-			
-			// Second, we'd want to perform some kind of type checking here.			
+
+			// Second, we'd want to perform some kind of type checking here.
 			new DefiniteAssignment().check(ast);
 			new TypeChecker().check(ast);
-			
+
 			// Third, we'd want to run the interpreter or compile the file.
 			switch(mode) {
 			case interpret:
@@ -99,21 +104,21 @@ public class Main {
 				File classFile = new File(filename.substring(0,filename.lastIndexOf('.')) + ".class");
 				System.out.println("Compiling to JVM Bytecode...");
 				ClassFileWriter cfw = new ClassFileWriter(classFile);
-				cfw.write(ast);				
+				cfw.write(ast);
 				break;
 			case x86:
 				System.out.println("Compiling to X86 Assembly Language...");
-				// First, determine output filename
-				// File asFile = new File(filename.substring(0,filename.lastIndexOf('.')) + ".s");
-				// Second, build the x86 file
-				// X86File xf = new X86FileWriter(target).build(ast);
-				// Third, write that file in GAS compatible assembly language
-				// AsmFileWriter afw = new AsmFileWriter(asFile); 
-				// afw.write(xf);
-				// afw.close();
+//				 First, determine output filename
+				 File asFile = new File(filename.substring(0,filename.lastIndexOf('.')) + ".s");
+//				 Second, build the x86 file
+				 X86File xf = new X86FileWriter(target).build(ast);
+//				 Third, write that file in GAS compatible assembly language
+				 AsmFileWriter afw = new AsmFileWriter(asFile);
+				 afw.write(xf);
+				 afw.close();
 				break;
 			}
-			
+
 		} catch (SyntaxError e) {
 			if (e.filename() != null) {
 				e.outputSourceError(System.out);
@@ -143,7 +148,7 @@ public class Main {
 
 	/**
 	 * Print out information regarding command-line arguments
-	 * 
+	 *
 	 */
 	public static void usage() {
 		String[][] info = {

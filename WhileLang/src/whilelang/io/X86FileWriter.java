@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import jx86.lang.*;
+import jx86.lang.Instruction.ImmRegOp;
 import whilelang.lang.*;
 import whilelang.util.*;
 
@@ -605,6 +606,19 @@ public class X86FileWriter {
 			X86File.Code code, X86File.Data data) {
 
 		List<Instruction> instructions = code.instructions;
+
+		Register reg = null;
+
+		if (e.getValue() instanceof Integer){
+		Instruction inst = new Instruction.ImmReg(ImmRegOp.mov, ((Integer)e.getValue()).longValue(), reg);
+
+		} else if (e.getValue() instanceof Character){
+
+		} else if (e.getValue() instanceof String){
+
+		} else if (e.getValue() instanceof Double){
+
+		}
 		// TODO: implement me!
 	}
 

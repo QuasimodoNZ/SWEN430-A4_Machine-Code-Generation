@@ -4,6 +4,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
 	<classpathentry kind="lib" path="lib/jasm-v0.1.7.jar"/>
-	<classpathentry kind="lib" path="lib/jx86-v0.1.3.jar"/>
+	<classpathentry kind="lib" path="lib/jx86-v0.1.3.jar" sourcepath="/am/st-james/home1/riddelbenj/Development/SWEN430-A4_Machine-Code-Generation/WhileLang/lib/jx86.zip"/>
 	<classpathentry kind="output" path="src"/>
 </classpath>
