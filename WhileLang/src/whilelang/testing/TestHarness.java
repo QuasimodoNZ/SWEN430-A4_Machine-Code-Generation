@@ -12,13 +12,13 @@ import java.io.StringReader;
 public class TestHarness {
 
 	private static final String JASM_JAR = "../../lib/jasm-v0.1.7.jar".replace(
- 			'/', File.separatorChar);
+			'/', File.separatorChar);
 	private static final String JX86_JAR = "../../lib/jx86-v0.1.3.jar".replace(
- 			'/', File.separatorChar);
+			'/', File.separatorChar);
 
 	protected String srcPath; // path to source files
-	protected  String outputPath; // path to output files
-	protected  String outputExtension; // the extension of output files
+	protected String outputPath; // path to output files
+	protected String outputExtension; // the extension of output files
 
 	/**
 	 * Construct a test harness object.
@@ -62,17 +62,25 @@ public class TestHarness {
 					+ JX86_JAR;
 			classpath = classpath.replace('/', File.separatorChar);
 			String tmp = "java -cp " + classpath;
-			for(String arg : args) {
+			for (String arg : args) {
 				tmp += " " + arg;
 			}
 			Process p = Runtime.getRuntime().exec(tmp, null, new File(path));
 
 			StringBuffer syserr = new StringBuffer();
 			StringBuffer sysout = new StringBuffer();
-			new StreamGrabber(p.getErrorStream(), syserr);
-			new StreamGrabber(p.getInputStream(), sysout);
+			StreamGrabber p3 = new StreamGrabber(p.getErrorStream(), syserr);
+			StreamGrabber p2 = new StreamGrabber(p.getInputStream(), sysout);
 			int exitCode = p.waitFor();
-			System.err.println(syserr); // propagate anything from the error stream
+			// we will not be ready to examine the output until all three
+			// threads have finished
+			while (!p2.done || !p3.done) {
+				Thread.currentThread().yield();
+			}
+			// Now process the error code
+
+			System.err.println(syserr); // propagate anything from the error
+										// stream
 			if (exitCode != 0) {
 				System.err
 						.println("============================================================");
@@ -92,8 +100,6 @@ public class TestHarness {
 		return null;
 	}
 
-
-
 	/**
 	 * Compare the output of executing java on the test case with a reference
 	 * file.
@@ -104,7 +110,7 @@ public class TestHarness {
 	 *            The full path to the reference file. This should use the
 	 *            appropriate separator char for the host operating system.
 	 */
-	protected  static void compare(String output, String referenceFile) {
+	protected static void compare(String output, String referenceFile) {
 		try {
 			BufferedReader outReader = new BufferedReader(new StringReader(
 					output));
@@ -148,6 +154,7 @@ public class TestHarness {
 	static public class StreamGrabber extends Thread {
 		private InputStream input;
 		private StringBuffer buffer;
+		public volatile boolean done;
 
 		public StreamGrabber(InputStream input, StringBuffer buffer) {
 			this.input = input;
@@ -163,6 +170,9 @@ public class TestHarness {
 					buffer.append((char) nextChar);
 				}
 			} catch (IOException ioe) {
+			} finally {
+				done = true;
+
 			}
 		}
 	}

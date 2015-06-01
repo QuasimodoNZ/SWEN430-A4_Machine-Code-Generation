@@ -1,5 +1,7 @@
 package whilelang.io;
 
+import jasm.lang.Bytecode;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -279,13 +281,35 @@ public class X86FileWriter {
 		List<Instruction> instructions = code.instructions;
 
 		statement.getCondition();
-		//need to add instructions for evaluating the expression
-		//need to compare this to zero
-		
+		// need to add instructions for evaluating the expression
+		// need to compare this to zero
+
 		statement.getTrueBranch();
 		statement.getFalseBranch();
 
-//TODO need to implement this
+		// make labels
+		String falseLabel = freshLabel(), endLabel = freshLabel();
+		// evaluate condition put into ***** register
+		translate(statement.getCondition(), HDI, new ArrayList<Register>(REGISTER_POOL), localVariables, code, data);
+		// compare agaisnt 0?
+		instructions.add(new Instruction.ImmReg(Instruction.ImmRegOp.cmp, 0,
+				HDI));
+		// do the jump zero thingy to the false branch
+		instructions
+		.add(new Instruction.Addr(Instruction.AddrOp.jz, falseLabel));
+		// add instructions for true branch
+		translate(statement.getTrueBranch(), localVariables, code, data);
+		// add jump to end label
+		instructions
+		.add(new Instruction.Addr(Instruction.AddrOp.jmp, endLabel));
+		// add label for false branch
+		instructions.add(new Instruction.Label(falseLabel));
+		// add instructions for false branch
+		translate(statement.getFalseBranch(), localVariables, code, data);
+		// add label for end
+		instructions.add(new Instruction.Label(endLabel));
+
+		// TODO need to implement this
 	}
 
 	public void translate(Stmt.Print statement,
@@ -635,7 +659,6 @@ public class X86FileWriter {
 
 		List<Instruction> instructions = code.instructions;
 
-
 		if (e.getValue() instanceof Boolean) {
 			long l;
 			if ((Boolean) e.getValue())
@@ -650,8 +673,7 @@ public class X86FileWriter {
 			instructions.add(new Instruction.ImmReg(ImmRegOp.mov,
 					(long) (((Character) e.getValue()).charValue()), target));
 		} else if (e.getValue() instanceof String) {
-			String label = uniqueLabel(data.constants);
-			System.out.println(label);
+			String label = freshLabel();
 			data.constants.add(new Constant.String(label, (String) (e
 					.getValue())));
 			instructions.add(new Instruction.AddrReg(AddrRegOp.lea, label,
@@ -660,20 +682,6 @@ public class X86FileWriter {
 			instructions.add(new Instruction.ImmReg(ImmRegOp.mov, Double
 					.doubleToLongBits(((Double) e.getValue())), target));
 		}
-	}
-
-	private String uniqueLabel(List<Constant> constants) {
-		String s = null;
-		int i = 0;
-		while (s == null) {
-			s = "str" + i;
-			for (Constant c : constants)
-				if (c.label.equalsIgnoreCase(s)) {
-					s = null;
-					continue;
-				}
-		}
-		return s;
 	}
 
 	public void translate(Expr.Cast e, Register target,

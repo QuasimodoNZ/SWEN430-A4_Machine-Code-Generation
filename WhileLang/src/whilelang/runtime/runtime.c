@@ -28,13 +28,13 @@ int widthof(slot_t *type) {
     // void
     break;
   case BOOL_TAG:
-  case CHAR_TAG: 
-  case INT_TAG: 
-  case REAL_TAG: 
-  case STRING_TAG: 
+  case CHAR_TAG:
+  case INT_TAG:
+  case REAL_TAG:
+  case STRING_TAG:
     // bool
-    return SLOT_SIZE;    
-  case LIST_TAG: 
+    return SLOT_SIZE;
+  case LIST_TAG:
     {
       int i;
       int width = 0;
@@ -49,6 +49,8 @@ int widthof(slot_t *type) {
       return width;
     }
   }
+  // for void case
+  return 0;
 }
 
 void internal_tostring(slot_t *item, slot_t *type, char* buf) {
@@ -56,6 +58,7 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
   // NOTE: this function is not working properly yet.
 
   slot_t tag = *type;
+  double val;
 
   switch(tag) {
   case VOID_TAG:
@@ -69,7 +72,7 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
       sprintf(buf,"true");
     }
     break;
-  case CHAR_TAG: 
+  case CHAR_TAG:
     {
       // char
       char tmp[2];
@@ -84,13 +87,13 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
     break;
   case REAL_TAG:
     // real
-    sprintf(buf,"%g",*item);
+    sprintf(buf,"%g",(double) *item);
     break;
   case STRING_TAG:
     // string
     sprintf(buf,"%s",item);
     break;
-  case RECORD_TAG: 
+  case RECORD_TAG:
     {
       int i;
       // record
@@ -134,7 +137,7 @@ void internal_print(slot_t *item, slot_t *type) {
       printf("true");
     }
     break;
-  case CHAR_TAG: 
+  case CHAR_TAG:
     {
       // char
       char tmp[2];
@@ -149,13 +152,13 @@ void internal_print(slot_t *item, slot_t *type) {
     break;
   case REAL_TAG:
     // real
-    printf("%g",*item);
+    printf("%g",(double) *item);
     break;
   case STRING_TAG:
     // string
     printf("%s",item);
     break;
-  case RECORD_TAG: 
+  case RECORD_TAG:
     {
       int i;
       // record
@@ -185,10 +188,10 @@ void print(slot_t item, slot_t *type) {
   case 2:
   case 3:
   case 4:
-    internal_print(&item,type);    
+    internal_print(&item,type);
     break;
   default:
-    internal_print((slot_t*)item,type); 
+    internal_print((slot_t*)item,type);
   }
   printf("\n");
 }
