@@ -266,6 +266,15 @@ public class X86ValidTests extends TestHarness {
 	}
 
 	@Test
+	public void IfElse_Valid_4() {
+		runX86Test("IfElse_Valid_4");
+	}
+	@Test
+	public void IfElse_Valid_5() {
+		runX86Test("IfElse_Valid_5");
+	}
+
+	@Test
 	public void IntDefine_Valid_1() {
 		runX86Test("IntDefine_Valid_1");
 	}

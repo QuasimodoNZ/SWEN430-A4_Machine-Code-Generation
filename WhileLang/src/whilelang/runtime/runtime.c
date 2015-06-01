@@ -49,7 +49,6 @@ int widthof(slot_t *type) {
       return width;
     }
   }
-  // for void case
   return 0;
 }
 
@@ -58,7 +57,6 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
   // NOTE: this function is not working properly yet.
 
   slot_t tag = *type;
-  double val;
 
   switch(tag) {
   case VOID_TAG:
@@ -87,7 +85,7 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
     break;
   case REAL_TAG:
     // real
-    sprintf(buf,"%g",(double) *item);
+    sprintf(buf,"%g",(double)*item);
     break;
   case STRING_TAG:
     // string
@@ -117,6 +115,7 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
       sprintf(buf,"}");
     }
   }
+  fflush(stdout);
 }
 
 void internal_print(slot_t *item, slot_t *type) {
@@ -152,7 +151,7 @@ void internal_print(slot_t *item, slot_t *type) {
     break;
   case REAL_TAG:
     // real
-    printf("%g",(double) *item);
+    printf("%g",(double)*item);
     break;
   case STRING_TAG:
     // string
@@ -178,6 +177,7 @@ void internal_print(slot_t *item, slot_t *type) {
       printf("}");
     }
   }
+  fflush(stdout);
 }
 
 void print(slot_t item, slot_t *type) {
@@ -194,6 +194,7 @@ void print(slot_t item, slot_t *type) {
     internal_print((slot_t*)item,type);
   }
   printf("\n");
+  fflush(stdout);
 }
 
 char *str_append(char *lhs, char *rhs) {

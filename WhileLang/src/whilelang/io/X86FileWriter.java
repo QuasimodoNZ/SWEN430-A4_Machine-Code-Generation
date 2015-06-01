@@ -308,8 +308,6 @@ public class X86FileWriter {
 		translate(statement.getFalseBranch(), localVariables, code, data);
 		// add label for end
 		instructions.add(new Instruction.Label(endLabel));
-
-		// TODO need to implement this
 	}
 
 	public void translate(Stmt.Print statement,
