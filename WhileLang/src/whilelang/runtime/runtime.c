@@ -118,6 +118,10 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
   fflush(stdout);
 }
 
+slot_t* index_of(slot_t * item, slot_t *index){
+
+}
+
 void internal_print(slot_t *item, slot_t *type) {
 
   // NOTE: this function is not working properly yet.

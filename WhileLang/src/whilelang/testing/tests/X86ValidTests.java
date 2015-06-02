@@ -37,7 +37,7 @@ public class X86ValidTests extends TestHarness {
 
 	public void compileWithGcc(String dir, String target, String... files) {
 		try {
-			String tmp = "gcc -Wno-format -o " + dir + File.separatorChar
+			String tmp = "gcc -g -Wno-format -o " + dir + File.separatorChar
 					+ target;
 			for (String f : files) {
 				tmp += " " + dir + File.separatorChar + f;
@@ -50,9 +50,8 @@ public class X86ValidTests extends TestHarness {
 			int exitCode = p.waitFor();
 			// we will not be ready to examine the output until all three
 			// threads have finished
-			while (!p2.done || !p3.done) {
-				Thread.currentThread().yield();
-			}
+			p2.join();
+			p3.join();
 			// Now process the error code
 
 			System.err.println(syserr); // propagate anything from the error
@@ -77,9 +76,11 @@ public class X86ValidTests extends TestHarness {
 					dir + File.separatorChar + executable);
 			StringBuffer syserr = new StringBuffer();
 			StringBuffer sysout = new StringBuffer();
-			new StreamGrabber(p.getErrorStream(), syserr);
-			new StreamGrabber(p.getInputStream(), sysout);
+			StreamGrabber p2 = new StreamGrabber(p.getErrorStream(), syserr);
+			StreamGrabber p3 = new StreamGrabber(p.getInputStream(), sysout);
 			int exitCode = p.waitFor();
+			p2.join();
+			p3.join();
 			System.err
 					.println("============================================================");
 			System.err.println(dir + File.separatorChar + executable);
@@ -191,14 +192,19 @@ public class X86ValidTests extends TestHarness {
 	 *
 	 *
 	 */
-	// @Test
-	// public void Char_Valid_2() {
-	// runX86Test("Char_Valid_2");
-	// }
+	 @Test
+	 public void Char_Valid_2() {
+	 runX86Test("Char_Valid_2");
+	 }
 
 	@Test
 	public void Char_Valid_3() {
 		runX86Test("Char_Valid_3");
+	}
+
+	@Test
+	public void Char_Valid_4() {
+		runX86Test("Char_Valid_4");
 	}
 
 	@Ignore("const")
@@ -269,6 +275,7 @@ public class X86ValidTests extends TestHarness {
 	public void IfElse_Valid_4() {
 		runX86Test("IfElse_Valid_4");
 	}
+
 	@Test
 	public void IfElse_Valid_5() {
 		runX86Test("IfElse_Valid_5");
@@ -302,6 +309,11 @@ public class X86ValidTests extends TestHarness {
 	@Test
 	public void LengthOf_Valid_1() {
 		runX86Test("LengthOf_Valid_1");
+	}
+
+	@Test
+	public void LengthOf_Valid_2() {
+		runX86Test("LengthOf_Valid_2");
 	}
 
 	@Test
@@ -488,6 +500,7 @@ public class X86ValidTests extends TestHarness {
 		runX86Test("Real_Valid_1");
 	}
 
+	@Ignore
 	@Test
 	public void RecordAccess_Valid_2() {
 		runX86Test("RecordAccess_Valid_2");

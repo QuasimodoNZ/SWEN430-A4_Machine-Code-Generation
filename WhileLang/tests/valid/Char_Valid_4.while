@@ -1,0 +1,14 @@
+void main() {
+	string s = "Hello";
+	print(s);
+	s[0] = 'W';
+	print(s);
+	s[1] = 'o';
+	print(s);
+	s[2] = 'r';
+	print(s);
+	s[3] = 'l';
+	print(s);
+	s[4] = 'd';
+    print(s);
+}
