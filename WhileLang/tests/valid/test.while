@@ -1,0 +1,12 @@
+void main() {
+	int i = 5;
+	print i;
+	string s = "Hello World";
+	print s;
+	int sl = |s|;
+	print sl;
+	print (i < sl);
+
+	print (i > |"Hello World"|);
+
+}

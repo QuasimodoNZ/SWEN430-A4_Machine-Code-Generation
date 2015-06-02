@@ -529,6 +529,7 @@ public class X86FileWriter {
 		ArrayList<Register> nFreeRegisters = new ArrayList<Register>(
 				freeRegisters);
 		nFreeRegisters.remove(target);
+		nFreeRegisters.remove(rhsTarget);
 
 		translate(e.getRhs(), rhsTarget, nFreeRegisters, localVariables, code,
 				data);
@@ -895,6 +896,7 @@ public class X86FileWriter {
 			// get pointer to start in spare register
 			List<Register> free = new ArrayList<Register>(freeRegisters);
 			Register pointerRegister = free.remove(0);
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, target, pointerRegister));
 			translate(e.getExpr(), pointerRegister, free, localVariables, code,
 					data);
 			Register valueRegister = free.remove(0);

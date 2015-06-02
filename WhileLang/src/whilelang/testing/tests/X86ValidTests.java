@@ -97,6 +97,11 @@ public class X86ValidTests extends TestHarness {
 	}
 
 	@Test
+	public void Test() {
+		runX86Test("test");
+	}
+
+	@Test
 	public void BoolAssign_Valid_1() {
 		runX86Test("BoolAssign_Valid_1");
 	}
@@ -192,10 +197,10 @@ public class X86ValidTests extends TestHarness {
 	 *
 	 *
 	 */
-	 @Test
-	 public void Char_Valid_2() {
-	 runX86Test("Char_Valid_2");
-	 }
+	@Test
+	public void Char_Valid_2() {
+		runX86Test("Char_Valid_2");
+	}
 
 	@Test
 	public void Char_Valid_3() {
