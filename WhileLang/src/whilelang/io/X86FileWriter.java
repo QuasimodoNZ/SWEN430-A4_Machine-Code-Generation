@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import jx86.lang.*;
+import jx86.lang.Instruction.AddrOp;
 import jx86.lang.Instruction.AddrRegOp;
 import jx86.lang.Instruction.ImmIndRegOp;
 import jx86.lang.Instruction.ImmRegOp;
@@ -264,8 +265,6 @@ public class X86FileWriter {
 			// Moving the pointer to the correct place
 			instructions.add(new Instruction.RegReg(RegRegOp.add, index,
 					pointer));
-
-
 
 			Register valueRegister = freeRegisters.remove(0);
 
@@ -534,6 +533,21 @@ public class X86FileWriter {
 		translate(e.getRhs(), rhsTarget, nFreeRegisters, localVariables, code,
 				data);
 
+		// For floating points we need to mvoe them to the float registers
+		Register oldTarget = target, oldRhsTarget = rhsTarget;
+
+		boolean b = lhsType instanceof Type.Real;
+
+		if (b) {
+			target = Register.XMM0;
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, oldTarget,
+					target));
+
+			rhsTarget = Register.XMM1;
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, oldRhsTarget,
+					rhsTarget));
+		}
+
 		// Finally, perform the binary operation.
 		switch (e.getOp()) {
 		case AND:
@@ -553,23 +567,32 @@ public class X86FileWriter {
 					rhsTarget, target));
 			break;
 		case MUL:
-			instructions.add(new Instruction.RegReg(Instruction.RegRegOp.imul,
-					rhsTarget, target));
+			if (b)
+				instructions.add(new Instruction.RegReg(
+						Instruction.RegRegOp.mul, rhsTarget, target));
+			else
+				instructions.add(new Instruction.RegReg(
+						Instruction.RegRegOp.imul, rhsTarget, target));
 			break;
 		case DIV:
 			// The idiv instruction is curious because you cannot control where
 			// the result is stored. That is, the result is always stored into
 			// the hdx:hax register pairing (where hdx = remainder, hax =
 			// quotient).
-			instructions.add(new Instruction.RegReg(Instruction.RegRegOp.mov,
-					target, HAX));
-			// TODO: I'm not completely sure why we need this!
-			instructions.add(new Instruction.Unit(Instruction.UnitOp.cltd));
-			// FIXME: this trashes the HDX register which could be in use!
-			instructions.add(new Instruction.Reg(Instruction.RegOp.idiv,
-					rhsTarget));
-			instructions.add(new Instruction.RegReg(Instruction.RegRegOp.mov,
-					HAX, target));
+			if (b)
+				instructions.add(new Instruction.RegReg(
+						Instruction.RegRegOp.div, rhsTarget, target));
+			else {
+				instructions.add(new Instruction.RegReg(
+						Instruction.RegRegOp.mov, target, HAX));
+				// TODO: I'm not completely sure why we need this!
+				instructions.add(new Instruction.Unit(Instruction.UnitOp.cltd));
+				// FIXME: this trashes the HDX register which could be in use!
+				instructions.add(new Instruction.Reg(Instruction.RegOp.idiv,
+						rhsTarget));
+				instructions.add(new Instruction.RegReg(
+						Instruction.RegRegOp.mov, HAX, target));
+			}
 			break;
 		case REM:
 			// The idiv instruction is curious because you cannot control where
@@ -687,6 +710,14 @@ public class X86FileWriter {
 		default:
 			throw new IllegalArgumentException("Unknown binary operator: " + e);
 		}
+
+		if (b) {
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, target,
+					oldTarget));
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, rhsTarget,
+					oldRhsTarget));
+		}
+
 	}
 
 	public void translate(Expr.Constant e, Register target,
@@ -731,17 +762,50 @@ public class X86FileWriter {
 			X86File.Code code, X86File.Data data) {
 		List<Instruction> instructions = code.instructions;
 
-		translate(e.getSource(), target, freeRegisters, localVariables, code,
-				data);
-		ArrayList<Register> l = new ArrayList<Register>(freeRegisters);
-		Register index = l.remove(0);
-		translate(e.getIndex(), index, l, localVariables, code, data);
+		if (e.getSource().attribute(Attribute.Type.class).type instanceof Type.Strung) {
+			translate(e.getSource(), target, freeRegisters, localVariables,
+					code, data);
+			ArrayList<Register> l = new ArrayList<Register>(freeRegisters);
+			Register index = l.remove(0);
+			translate(e.getIndex(), index, l, localVariables, code, data);
 
-		instructions.add(new Instruction.RegReg(RegRegOp.add, target, index));
+			instructions
+					.add(new Instruction.RegReg(RegRegOp.add, target, index));
 
-		instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0, index,
-				target));
-		instructions.add(new Instruction.ImmReg(ImmRegOp.and, 255, target));
+			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
+					index, target));
+			instructions.add(new Instruction.ImmReg(ImmRegOp.and, 255, target));
+		} else {
+			// get a pointer that points to the start of the list
+			Register pointerRegister = freeRegisters.remove(0);
+			translate(e.getSource(), pointerRegister, new ArrayList<Register>(
+					freeRegisters), localVariables, code, data);
+
+			// create a register with the distance from the index
+			translate(e.getIndex(), target, new ArrayList<Register>(
+					freeRegisters), localVariables, code, data);
+
+			// initialise labels
+			String startLabel = freshLabel() + "Start_IndexOf", endLabel = freshLabel()
+					+ "End_IndexOf";
+			// add start label to instructions
+			instructions.add(new Instruction.Label(startLabel));
+			// compare index with 0
+			instructions.add(new Instruction.ImmReg(ImmRegOp.cmp, 0, target));
+			// if zero jump to end label
+			instructions.add(new Instruction.Addr(AddrOp.jz, endLabel));
+			// decment counter
+			instructions.add(new Instruction.Reg(RegOp.dec, target));
+			//dereference pointer and move register into pointer
+			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0, pointerRegister, pointerRegister));
+			// jump to start label
+			instructions.add(new Instruction.Addr(AddrOp.jmp, startLabel));
+			// add end label instruction
+			instructions.add(new Instruction.Label(endLabel));
+			// dereference pointer plus 8 offset into target
+			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 8, pointerRegister, target));
+		}
+
 	}
 
 	public void translate(Expr.Invoke e, Register target,
@@ -793,7 +857,87 @@ public class X86FileWriter {
 	public void translate(Expr.ListConstructor e, Register target,
 			List<Register> freeRegisters, Map<String, Integer> localVariables,
 			X86File.Code code, X86File.Data data) {
-		// TODO: implement me!
+
+		List<Instruction> instructions = code.instructions;
+		instructions.add(new Instruction.Label("List_constructor_start"));
+
+		// need to allocate 2 locations AKA 16 bytes AKA 128 bits, one location
+		// is for the pointer to the next in the linked list, the second is the
+		// value that is to be stored.
+		instructions
+				.add(new Instruction.ImmReg(ImmRegOp.mov, 16, Register.RDI));
+
+		// allocating the address, this stores the pointer in the RAX register
+		instructions.add(new Instruction.Addr(Instruction.AddrOp.call,
+				publicLabel("malloc")));
+
+		// gets the pointer value out of the register
+		instructions.add(new Instruction.RegReg(RegRegOp.mov, Register.RAX,
+				target));
+
+		instructions.add(new Instruction.Reg(RegOp.push, target));
+
+		Register pointerRegister = freeRegisters.remove(0), valueRegister = freeRegisters
+				.remove(0);
+		if (e.getArguments().isEmpty()) {
+			// need to store a zero value in some register
+			instructions.add(new Instruction.ImmReg(ImmRegOp.mov, 0,
+					valueRegister));
+
+			// need to zero both the value and the value at teh pointer (i.e. we
+			// will have one node with zero for both the value and the pointer)
+			instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+					valueRegister, 0, target));
+			instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+					valueRegister, 8, target));
+			instructions.add(new Instruction.Reg(RegOp.pop, target));
+			return;
+		}
+		// /// need to loop through all arguments and add them in
+		// store pointer to current address (starts at the first empty node) in
+		// new register
+		instructions.add(new Instruction.RegReg(RegRegOp.mov, target,
+				pointerRegister));
+
+		for (Expr expr : e.getArguments()) {
+			instructions.add(new Instruction.Label("Adding_argument"));
+			// translate expression into spare register.
+			translate(expr, valueRegister, new ArrayList<Register>(
+					freeRegisters), localVariables, code, data);
+			// move value to current location + offset of 8 (where the value is
+			// stored)
+			instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+					valueRegister, 8, pointerRegister));
+
+			// allocate space for new node
+			instructions.add(new Instruction.ImmReg(ImmRegOp.mov, 16,
+					Register.RDI));
+			// allocating the address, this stores the pointer in the RAX
+			// register
+			instructions.add(new Instruction.Addr(Instruction.AddrOp.call,
+					publicLabel("malloc")));
+			// gets the pointer value out of the register
+			instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+					Register.RAX, 0, pointerRegister));
+
+			// store address of next node in current address
+			instructions.add(new Instruction.RegReg(RegRegOp.mov, Register.RAX,
+					pointerRegister));
+			instructions.add(new Instruction.Label("Finished_adding_argument"));
+		}
+		// zero both values of current and current + 8 offset
+		// need to store a zero value in some register
+		instructions
+				.add(new Instruction.ImmReg(ImmRegOp.mov, 0, valueRegister));
+
+		// need to zero both the value and the value at teh pointer (i.e. we
+		// will have one node with zero for both the value and the pointer)
+		instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+				valueRegister, 0, pointerRegister));
+		instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+				valueRegister, 8, pointerRegister));
+		instructions.add(new Instruction.Reg(RegOp.pop, target));
+		instructions.add(new Instruction.Label("List_constructor_end"));
 	}
 
 	public void translate(Expr.RecordAccess e, Register target,
@@ -889,54 +1033,112 @@ public class X86FileWriter {
 					1, target));
 			break;
 		case NEG:
+
 			instructions
 					.add(new Instruction.Reg(Instruction.RegOp.neg, target));
 			break;
 		case LENGTHOF:
-			// get pointer to start in spare register
-			List<Register> free = new ArrayList<Register>(freeRegisters);
-			Register pointerRegister = free.remove(0);
-			instructions.add(new Instruction.RegReg(RegRegOp.mov, target, pointerRegister));
-			translate(e.getExpr(), pointerRegister, free, localVariables, code,
-					data);
-			Register valueRegister = free.remove(0);
+			if (e.getExpr().attribute(Attribute.Type.class).type instanceof Type.Strung) {
+				// get pointer to start in spare register
+				List<Register> free = new ArrayList<Register>(freeRegisters);
+				Register pointerRegister = free.remove(0);
+				instructions.add(new Instruction.RegReg(RegRegOp.mov, target,
+						pointerRegister));
+				translate(e.getExpr(), pointerRegister, free, localVariables,
+						code, data);
+				Register valueRegister = free.remove(0);
 
-			// zero value in target register (this is the index keeper)
-			instructions.add(new Instruction.ImmReg(ImmRegOp.mov, 0, target));
+				// zero value in target register (this is the index keeper)
+				instructions
+						.add(new Instruction.ImmReg(ImmRegOp.mov, 0, target));
 
-			// zero value in another spare register (we need to store \0 in a
-			// register to compare against)
-			// initialise labels
-			String startLabel = freshLabel(),
-			endLabel = freshLabel();
+				// zero value in another spare register (we need to store \0 in
+				// a
+				// register to compare against)
+				// initialise labels
+				String startLabel = freshLabel(), endLabel = freshLabel();
 
-			// start label
-			instructions.add(new Instruction.Label(startLabel));
+				// start label
+				instructions.add(new Instruction.Label(startLabel));
 
-			// compare *reference to register with \0
-			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
-					pointerRegister, valueRegister));
-			instructions.add(new Instruction.ImmReg(ImmRegOp.and, 255,
-					valueRegister));
-			instructions.add(new Instruction.ImmReg(ImmRegOp.cmp, 0,
-					valueRegister));
+				// compare *reference to register with \0
+				instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
+						pointerRegister, valueRegister));
+				instructions.add(new Instruction.ImmReg(ImmRegOp.and, 255,
+						valueRegister));
+				instructions.add(new Instruction.ImmReg(ImmRegOp.cmp, 0,
+						valueRegister));
 
-			// jump to end if true
-			instructions.add(new Instruction.Addr(Instruction.AddrOp.jz,
-					endLabel));
+				// jump to end if true
+				instructions.add(new Instruction.Addr(Instruction.AddrOp.jz,
+						endLabel));
 
-			// increment reference pointer
-			instructions.add(new Instruction.Reg(RegOp.inc, pointerRegister));
+				// increment reference pointer
+				instructions
+						.add(new Instruction.Reg(RegOp.inc, pointerRegister));
 
-			// increment counter (which is in the target
-			instructions.add(new Instruction.Reg(RegOp.inc, target));
+				// increment counter (which is in the target
+				instructions.add(new Instruction.Reg(RegOp.inc, target));
 
-			// jump to start
-			instructions.add(new Instruction.Addr(Instruction.AddrOp.jmp,
-					startLabel));
+				// jump to start
+				instructions.add(new Instruction.Addr(Instruction.AddrOp.jmp,
+						startLabel));
 
-			// end label
-			instructions.add(new Instruction.Label(endLabel));
+				// end label
+				instructions.add(new Instruction.Label(endLabel));
+
+			} else {
+				// it must be a list, and so we shall use my awesome linked list
+
+				// get pointer to start in spare register
+				Register pointerRegister = freeRegisters.remove(0);
+				instructions.add(new Instruction.RegReg(RegRegOp.mov, target,
+						pointerRegister));
+				translate(e.getExpr(), pointerRegister,
+						new ArrayList<Register>(freeRegisters), localVariables,
+						code, data);
+				Register valueRegister = freeRegisters.remove(0);
+
+				// zero value in target register (this is the index keeper)
+				instructions
+						.add(new Instruction.ImmReg(ImmRegOp.mov, 0, target));
+
+				// initialise labels
+				String startLabel = freshLabel(), endLabel = freshLabel();
+
+				// start label
+				instructions.add(new Instruction.Label(startLabel));
+
+				// compare *reference to register with \0
+				instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
+						pointerRegister, valueRegister));
+				// instructions.add(new Instruction.ImmReg(ImmRegOp.and, 255,
+				// valueRegister));
+				instructions.add(new Instruction.ImmReg(ImmRegOp.cmp, 0,
+						valueRegister));
+
+				// jump to end if true
+				instructions.add(new Instruction.Addr(Instruction.AddrOp.jz,
+						endLabel));
+
+				// need to change to the new pointer i.e. the value
+				// in the valueRegister
+				// instructions
+				// .add(new Instruction.Reg(RegOp.inc, pointerRegister));
+				instructions.add(new Instruction.RegReg(RegRegOp.mov,
+						valueRegister, pointerRegister));
+
+				// increment counter (which is in the target register)
+				instructions.add(new Instruction.Reg(RegOp.inc, target));
+
+				// jump to start
+				instructions.add(new Instruction.Addr(Instruction.AddrOp.jmp,
+						startLabel));
+
+				// end label
+				instructions.add(new Instruction.Label(endLabel));
+
+			}
 
 			// store index in target register (already done because im storing
 			// the counter in the target register)
@@ -1204,15 +1406,15 @@ public class X86FileWriter {
 	 * @return
 	 */
 	private int determineAlignedStackWidth(int minimum) {
-		if (target == Target.MACOS_X86_64) {
+		//if (target == Target.MACOS_X86_64) {
 			// round up to nearest 16 bytes
 			int tmp = (minimum / 16) * 16;
 			if (tmp < minimum) {
 				tmp = tmp + 16;
 			}
 			return tmp;
-		}
-		return minimum;
+		//}
+		//return minimum;
 	}
 
 	/**

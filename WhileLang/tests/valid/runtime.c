@@ -118,16 +118,12 @@ void internal_tostring(slot_t *item, slot_t *type, char* buf) {
   fflush(stdout);
 }
 
-slot_t* index_of(slot_t * item, slot_t *index){
-
-}
-
 void internal_print(slot_t *item, slot_t *type) {
 
   // NOTE: this function is not working properly yet.
 
   slot_t tag = *type;
-  double r;
+
   switch(tag) {
   case VOID_TAG:
     // void
@@ -155,8 +151,7 @@ void internal_print(slot_t *item, slot_t *type) {
     break;
   case REAL_TAG:
     // real
-	r = *((double*)item);
-    printf("%g",r);
+    printf("%g",(double)*item);
     break;
   case STRING_TAG:
     // string
@@ -211,7 +206,7 @@ char *str_append(char *lhs, char *rhs) {
 char *str_left_append(char *lhs, slot_t rhs, slot_t *type) {
   int lhsLen = strlen(lhs);
   slot_t tag = *type;
-  char buf[1024] = {0};
+  char buf[1024];
   strcat(buf,lhs);
 
   switch(tag) {

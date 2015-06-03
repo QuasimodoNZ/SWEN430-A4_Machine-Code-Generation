@@ -186,17 +186,6 @@ public class X86ValidTests extends TestHarness {
 		runX86Test("Char_Valid_1");
 	}
 
-	/**
-	 * This isnt working at the moment because the indexof expression doesnt
-	 * work
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 */
 	@Test
 	public void Char_Valid_2() {
 		runX86Test("Char_Valid_2");
@@ -470,6 +459,7 @@ public class X86ValidTests extends TestHarness {
 		runX86Test("MultiLineComment_Valid_2");
 	}
 
+	@Ignore
 	@Test
 	public void RealDiv_Valid_1() {
 		runX86Test("RealDiv_Valid_1");
