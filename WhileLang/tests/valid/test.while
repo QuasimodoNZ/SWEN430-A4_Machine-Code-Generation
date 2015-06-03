@@ -1,5 +1,5 @@
 void main() {
-	[int] l = [5];
-	int i = 66;
-	print (l[0]);
+	[int] l = [10, 20];
+	l[1] = 2;
+	print (l[1]);
 }

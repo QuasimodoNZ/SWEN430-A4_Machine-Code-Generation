@@ -19,6 +19,7 @@ import jx86.lang.Instruction.RegOp;
 import jx86.lang.Instruction.RegRegOp;
 import jx86.lang.Register.Width;
 import whilelang.lang.*;
+import whilelang.lang.Expr.RecordAccess;
 import whilelang.util.*;
 
 public class X86FileWriter {
@@ -251,31 +252,70 @@ public class X86FileWriter {
 			List<Register> freeRegisters = new ArrayList<Register>(
 					REGISTER_POOL);
 
-			Register pointer = freeRegisters.remove(0);
+			if (v.getSource().attribute(Attribute.Type.class).type instanceof Type.Strung) {
+				Register pointer = freeRegisters.remove(0);
 
-			// Getting the pointer to the start of the string
-			translate(v.getSource(), pointer, freeRegisters, localVariables,
-					code, data);
+				// Getting the pointer to the start of the string
+				translate(v.getSource(), pointer, freeRegisters,
+						localVariables, code, data);
 
-			// Getting the index value that we want to assign at
-			Register index = freeRegisters.remove(0);
-			translate(v.getIndex(), index, freeRegisters, localVariables, code,
-					data);
+				// Getting the index value that we want to assign at
+				Register index = freeRegisters.remove(0);
+				translate(v.getIndex(), index, freeRegisters, localVariables,
+						code, data);
 
-			// Moving the pointer to the correct place
-			instructions.add(new Instruction.RegReg(RegRegOp.add, index,
-					pointer));
+				// Moving the pointer to the correct place
+				instructions.add(new Instruction.RegReg(RegRegOp.add, index,
+						pointer));
 
-			Register valueRegister = freeRegisters.remove(0);
+				Register valueRegister = freeRegisters.remove(0);
 
-			instructions.add(new Instruction.RegReg(RegRegOp.mov, HDI,
-					valueRegister));
-			Register lilValueRegister = valueRegister.sibling(Width.Byte);
+				instructions.add(new Instruction.RegReg(RegRegOp.mov, HDI,
+						valueRegister));
+				Register lilValueRegister = valueRegister.sibling(Width.Byte);
 
-			// move the value from the little register into the location from
-			// the pointer
-			instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
-					lilValueRegister, 0, pointer));
+				// move the value from the little register into the location
+				// from
+				// the pointer
+				instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
+						lilValueRegister, 0, pointer));
+			} else {
+				// get a pointer that points to the start of the list
+				Register pointerRegister = freeRegisters.remove(0), target = freeRegisters
+						.remove(0);
+				translate(v.getSource(), pointerRegister,
+						new ArrayList<Register>(freeRegisters), localVariables,
+						code, data);
+
+				// create a register with the distance from the index
+				translate(v.getIndex(), target, new ArrayList<Register>(
+						freeRegisters), localVariables, code, data);
+
+				// initialise labels
+				String startLabel = freshLabel() + "Start_IndexOf", endLabel = freshLabel()
+						+ "End_IndexOf";
+				// add start label to instructions
+				instructions.add(new Instruction.Label(startLabel));
+				// compare index with 0
+				instructions
+						.add(new Instruction.ImmReg(ImmRegOp.cmp, 0, target));
+				// if zero jump to end label
+				instructions.add(new Instruction.Addr(AddrOp.jz, endLabel));
+				// decment counter
+				instructions.add(new Instruction.Reg(RegOp.dec, target));
+				// dereference pointer and move register into pointer
+				instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
+						pointerRegister, pointerRegister));
+				// jump to start label
+				instructions.add(new Instruction.Addr(AddrOp.jmp, startLabel));
+				// add end label instruction
+				instructions.add(new Instruction.Label(endLabel));
+				// dereference pointer plus 8 offset into target
+
+				instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,HDI, 8,
+						pointerRegister));
+
+			}
 		}
 	}
 
@@ -796,14 +836,17 @@ public class X86FileWriter {
 			instructions.add(new Instruction.Addr(AddrOp.jz, endLabel));
 			// decment counter
 			instructions.add(new Instruction.Reg(RegOp.dec, target));
-			//dereference pointer and move register into pointer
-			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0, pointerRegister, pointerRegister));
+			// dereference pointer and move register into pointer
+			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 0,
+					pointerRegister, pointerRegister));
 			// jump to start label
 			instructions.add(new Instruction.Addr(AddrOp.jmp, startLabel));
 			// add end label instruction
 			instructions.add(new Instruction.Label(endLabel));
 			// dereference pointer plus 8 offset into target
-			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 8, pointerRegister, target));
+
+			instructions.add(new Instruction.ImmIndReg(ImmIndRegOp.mov, 8,
+					pointerRegister, target));
 		}
 
 	}
@@ -859,7 +902,6 @@ public class X86FileWriter {
 			X86File.Code code, X86File.Data data) {
 
 		List<Instruction> instructions = code.instructions;
-		instructions.add(new Instruction.Label("List_constructor_start"));
 
 		// need to allocate 2 locations AKA 16 bytes AKA 128 bits, one location
 		// is for the pointer to the next in the linked list, the second is the
@@ -900,7 +942,6 @@ public class X86FileWriter {
 				pointerRegister));
 
 		for (Expr expr : e.getArguments()) {
-			instructions.add(new Instruction.Label("Adding_argument"));
 			// translate expression into spare register.
 			translate(expr, valueRegister, new ArrayList<Register>(
 					freeRegisters), localVariables, code, data);
@@ -923,7 +964,6 @@ public class X86FileWriter {
 			// store address of next node in current address
 			instructions.add(new Instruction.RegReg(RegRegOp.mov, Register.RAX,
 					pointerRegister));
-			instructions.add(new Instruction.Label("Finished_adding_argument"));
 		}
 		// zero both values of current and current + 8 offset
 		// need to store a zero value in some register
@@ -937,7 +977,6 @@ public class X86FileWriter {
 		instructions.add(new Instruction.RegImmInd(RegImmIndOp.mov,
 				valueRegister, 8, pointerRegister));
 		instructions.add(new Instruction.Reg(RegOp.pop, target));
-		instructions.add(new Instruction.Label("List_constructor_end"));
 	}
 
 	public void translate(Expr.RecordAccess e, Register target,
@@ -1406,15 +1445,15 @@ public class X86FileWriter {
 	 * @return
 	 */
 	private int determineAlignedStackWidth(int minimum) {
-		//if (target == Target.MACOS_X86_64) {
-			// round up to nearest 16 bytes
-			int tmp = (minimum / 16) * 16;
-			if (tmp < minimum) {
-				tmp = tmp + 16;
-			}
-			return tmp;
-		//}
-		//return minimum;
+		// if (target == Target.MACOS_X86_64) {
+		// round up to nearest 16 bytes
+		int tmp = (minimum / 16) * 16;
+		if (tmp < minimum) {
+			tmp = tmp + 16;
+		}
+		return tmp;
+		// }
+		// return minimum;
 	}
 
 	/**
